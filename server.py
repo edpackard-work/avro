@@ -2,15 +2,38 @@ import avro.datafile
 import avro.io
 import io
 import socket
+import struct
+
+class Disconnect(Exception):
+    pass
+
+def read_block(connection, message_size):
+    bytes_read = 0
+    block = b''
+    while bytes_read < message_size:
+        data = connection.recv(message_size - bytes_read)
+        if len(data) == 0:
+            raise Disconnect()
+        block += data
+        bytes_read += len(data)
+        print("Read {} bytes".format(len(data)))
+    print("Read {} byte block".format(len(block)))
+    return block
 
 def handle_client (connection, address):
-    data = connection.recv(1024)
-    message_buf = io.BytesIO(data)
-    reader = avro.datafile.DataFileReader(message_buf, 
-        avro.io.DatumReader())
-    for thing in reader:
-        print(thing)
-    reader.close()
+    try:
+        while True:
+            size_block = read_block(connection, 4)
+            message_size, = struct.unpack("!L", size_block)
+            message_block = read_block(connection, message_size)
+            message_buf = io.BytesIO(message_block)
+            reader = avro.datafile.DataFileReader(message_buf, 
+                avro.io.DatumReader())
+            for message in reader:
+                print(message)
+            reader.close()
+    except Disconnect as e:
+        print("Client disconnected")
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -1,8 +1,16 @@
+import avro.datafile
+import avro.io
+import io
 import socket
 
 def handle_client (connection, address):
     data = connection.recv(1024)
-    print("Received message:", data)
+    message_buf = io.BytesIO(data)
+    reader = avro.datafile.DataFileReader(message_buf, 
+        avro.io.DatumReader())
+    for thing in reader:
+        print(thing)
+    reader.close()
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
